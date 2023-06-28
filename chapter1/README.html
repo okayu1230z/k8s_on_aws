@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>README.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+<link rel="stylesheet" href="file:///Users/okmt/books/logicalbeat_md.css" type="text/css">
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="docker%E3%81%A8%E3%81%AF">Dockerとは？</h1>
+<p>DockerとはDocker社が2013年に開発したコンテナ仮想化のためのOSS</p>
+<ul>
+<li>仮想マシン: ホストOS上でハイパーバイザーを起動しその上にゲストOSを起動する形で動作する</li>
+<li>コンテナ: ホストOSのカーネルを共有しつつ分離されたプロセスとして実行する環境</li>
+</ul>
+<p>Dockerのようなコンテナ環境ではDockerfileという定義ファイルで同一のコンテナイメージを簡単に作成可能</p>
+<p>Docker Hubといったコンテナレジストリによるエコシステムが整備されている</p>
+<p>インフラチームとアプリケーションチームで分業している組織だと、
+初期設定後にミドルウェア設定変更などが必要になるたび、インフラチームに依頼する必要がある</p>
+<p>Dockerを利用することでインフラチームへの依頼が不要になり上記のような組織的な課題を解決できる</p>
+<p>Dockerには上記の例を始めとした多くのメリットがあるが、一方で問題も抱えている</p>
+<p>システム構成が拡大してくると、複数のコンテナを連動して一つのサービスを実現することになる</p>
+<p>多くのコンテナが乱立していくと、コンテナ間の通信と可用性の確保が課題となってくる</p>
+<p>もし、コンテナが稼働している仮想マシンに問題があれば、すべてのコンテナが停止してサービス全体の停止に繋がることも考えられる</p>
+<p>Kubernetes（以降、k8s）のようなコンテナオーケストレーションツールは多くのコンテナを運用する上での課題を解決するために存在する</p>
+<h1 id="k8s%E3%81%A8%E3%81%AF">k8sとは？</h1>
+<p>k8sとはGoogle社が2014年に開発したコンテナオーケストレーションツール</p>
+<p>k8sではデータプレーンと呼ばれるサーバを複数起動し、その上に仮想的なオーケストレーションレイヤーを構築し、そこでコンテナを起動する</p>
+<p>これによってコンテナ利用者からはコンテナ群を一つの大きなマシンリソースとして透過的に見ることができ、インフラを抽象化することができる</p>
+<p>k8sのコントロールプレーンは以下のよう</p>
+<p>k8sの習得ハードルが一定以上となっているのは下記図のコントロールプレーンやその他のコンポーネントが存在するから</p>
+<p><img src="controlplane.png" alt="コントロールプレーン"></p>
+<h2 id="k8s%E3%81%AE%E5%9F%BA%E6%9C%AC%E3%82%AA%E3%83%96%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88">k8sの基本オブジェクト</h2>
+<ul>
+<li>Pod: k8sの最小単位。1つのPod内には1つ以上のコンテナが稼働できる</li>
+<li>ReplicaSet: Podをいくつ起動するか管理するオブジェクト</li>
+<li>Deployment: デプロイ履歴を管理。ロールバックなどの適用を行える。本番運用でPodを起動する場合はDeployment単位で起動することが多い</li>
+<li>Service: デプロイしたPodをk8sクラスター外部へ公開するための仕組みを提供するコンポーネント</li>
+</ul>
+<p>オブジェクトの関係性は以下のようになっている</p>
+<p><img src="deployment.png" alt="デプロイメント"></p>
+<h1 id="amazon-eks">Amazon EKS</h1>
+<p>k8sの適用を検討する上で最も障壁となるのは、コントロールプレーンの維持運用の難しさで、
+その維持運用をAWSが代行（マネージド）してくれるのがAmazon EKS(Elastic Kubernetes Service)</p>
+<p>EKSは以下のコンポーネントがマネージド</p>
+<ul>
+<li>kube-apiserver</li>
+<li>kube-scheduler</li>
+<li>controller</li>
+<li>CoreDNS</li>
+</ul>
+<h2 id="eks%E3%81%AE%E7%89%B9%E5%BE%B4">EKSの特徴</h2>
+<ul>
+<li>VPCとの統合: EKSではAmazon VPC(Virtual Private Network)統合ネットワーキングがサポートされており、PodにVPC内で使用しているアドレス帯域を使用することができる。クラスター外部との通信をシームレスに実現できる。</li>
+<li>IAMによる認証認可: Amazon IAM(Identity and Access Management)のIAMユーザやIAMロールを使っってクラスターへの認証認可を行える</li>
+<li>ELBとの連携: EKSではServiceを作成するときにロードバランサーを指定するとELB(Elastic Load Balancing)が自動生成される</li>
+<li>データプレーンの選択肢: EC2、Fargateからメリデリを考えながら選択できる</li>
+</ul>
+<h1 id="%E8%A3%9C%E8%B6%B3">補足</h1>
+<p><a href="https://github.com/kazusato/k8sbook">ソースコード</a>
+<a href="https://www.ric.co.jp/pdfs/contents/pdfs/1235_support.pdf">著書のフォローサイト</a></p>
+
+</body>
+</html>
