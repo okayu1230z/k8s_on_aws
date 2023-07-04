@@ -815,7 +815,7 @@ $ ./gradlew clean build
 Dockerfileがあるディレクトリでbuildコマンドを実行する
 
 ```
-$ docker build -t k8sbook/backend-app:1.0.0 --build-arg JAR_FILE=backend-app-1.0.0.jar .
+$ docker build --platform amd64 -t k8sbook/backend-app:1.1.0 --build-arg JAR_FILE=backend-app-1.0.0.jar .
 ```
 
 buildされた後の成果物
@@ -898,6 +898,138 @@ CURRENT   NAME                                                 CLUSTER          
 ```
 $ AUTHINFO='awscli@eks-worker-cluster.ap-northeast-1.eksctl.io'
 $ CLUSTER='eks-worker-cluster.ap-northeast-1.eksctl.io'
+$ kubectl config set-context eks-work --cluster $CLUSTER --user $AUTHINFO --namespace eks-work
+Context "eks-work" created.
+[2023-07-04T05:28:54] okmt@mba:~/plays/aws/k8s_on_aws $ kubectl config use-context eks-work
+Switched to context "eks-work".
+[2023-07-04T05:29:00] okmt@mba:~/plays/aws/k8s_on_aws $ kubectl config get-contexts
+CURRENT   NAME                                                 CLUSTER                                       AUTHINFO                                             NAMESPACE
+          awscli@eks-worker-cluster.ap-northeast-1.eksctl.io   eks-worker-cluster.ap-northeast-1.eksctl.io   awscli@eks-worker-cluster.ap-northeast-1.eksctl.io   
+*         eks-work                                             eks-worker-cluster.ap-northeast-1.eksctl.io   awscli@eks-worker-cluster.ap-northeast-1.eksctl.io   eks-work
+```
+
+データベース接続用Secret作成
+
+- RDSエンドポイントアドレス（CloudFormationの出力タブから取得）: 'eks-work-db.cl1b9exbukrt.ap-northeast-1.rds.amazonaws.com'
+- アプリケーション用データベースユーザのパスワード（Secret Managerの画面から取得）: ';1cg3bt0FAL)qiOC'
+
+```
+$ ENDPOINT='eks-work-db.cl1b9exbukrt.ap-northeast-1.rds.amazonaws.com' \
+PASSWORD=';1cg3bt0FAL)qiOC' \
+envsubst < k8sbook/eks-env/21_db_config_k8s.yaml.template | \
+kubectl apply -f - 
+
+secret/db-config created
+```
+
+[補足] secretの削除方法
+
+```
+$ kubectl get secrets
+NAME        TYPE     DATA   AGE
+db-config   Opaque   3      12h
+
+$ kubectl delete secret db-config
+secret "db-config" deleted
+```
+
+APIアプリケーションのデプロイ
+
+```
+$ ECR_HOST='761624429622.dkr.ecr.ap-northeast-1.amazonaws.com' \ 
+envsubst < k8sbook/eks-env/22_deployment_backend-app_k8s.yaml.template | \
+kubectl apply -f -
+
+deployment.apps/backend-app created
+deployment.apps/backend-app configured
+```
+
+コンポーネントの作成がうまく行かなかったとき
+
+```
+$ kubectl get all
+NAME                               READY   STATUS             RESTARTS   AGE
+pod/backend-app-6c7d4794c8-ljsg4   0/1     InvalidImageName   0          3m12s
+pod/backend-app-6c7d4794c8-xjrgt   0/1     InvalidImageName   0          3m12s
+
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend-app   0/2     2            0           3m13s
+
+NAME                                     DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-app-6c7d4794c8   2         2         0       3m13s
+```
+
+[補足] podの削除方法
+
+```
+$ kubectl delete -f k8sbook/eks-env/22_deployment_backend-app_k8s.yaml.template 
+deployment.apps "backend-app" deleted
+```
+
+コンポーネントの作成がうまく行った時は以下のようになる
+
+```
+$ kubectl get all
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/backend-app-89b68f9fc-gj94v   1/1     Running   0          88s
+pod/backend-app-89b68f9fc-mrbn2   1/1     Running   0          96s
+
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend-app   2/2     2            2           30m
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-app-89b68f9fc   2         2         2       30m
+```
+
+APIアプリケーションの公開
+
+```
+$ kubectl apply -f k8sbook/eks-env/23_service_backend-app_k8s.yaml 
+service/backend-app-service created
+
+$ kubectl get all
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/backend-app-89b68f9fc-gj94v   1/1     Running   0          10m
+pod/backend-app-89b68f9fc-mrbn2   1/1     Running   0          10m
+
+NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP                                                                  PORT(S)          AGE
+service/backend-app-service   LoadBalancer   10.100.61.85   a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com   8080:30893/TCP   4s
+
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend-app   2/2     2            2           38m
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-app-89b68f9fc   2         2         2       38m
+```
+
+EXTERNAL-IP列には「elb.amazonaws.com」で終わるアドレスが出力されている
+
+ロードバランサーが出来上がっている
+
+![el](./ec2lb.png)
+
+インスタンスタブを確認する
+
+![el](./ec2lbinstance.png)
+
+EXTERNAL-IPの値を指定して動作確認できる
+
+```
+$ curl -s http://a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com:8080/health
+{"status":"OK"}
+```
+
+
+## フロントエンドアプリケーションのビルドとデプロイ
+
+- フロントエンドアプリケーションのビルド
+- S3バケットとCloudFrontディストリビューションを作成
+- フロントエンドコンテンツをS3を配置
+- CloudFront経由でアクセスし、アプリケーションの動作確認を行う
+
+```
+$ cd k8sbook/frontend-app
+$ npm install
 ```
 
 
