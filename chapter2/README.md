@@ -4,6 +4,26 @@ SPAのフロントエンドとREST APIのバックエンドに分かれる
 
 また、スケジュール起動されるバッチアプリケーションも存在する
 
+## APIアプリケーション
+
+Spring Bootを利用している
+
+APIエンドポイントはRegionAPI、LocationAPI、HealthAPIをSpring MVCで作成している
+
+データベースアクセスはSpring Data JPAを使っている
+
+`@CrossOrigin`を利用してCORSをAPI側で設定している
+
+## フロントエンドアプリケーション
+
+Nuxt.jsを利用している
+
+## バッチアプリケーション
+
+CommandLineRunnderを用いてSpring Bootを用いて開発している
+
+バッチアプリケーションではSpring CloudというライブラリでS3にアクセスしている
+
 # EKS構築に利用するツール eksctl
 
 EKSクラスターの構築および管理を行うためのOSSコマンドラインツール
@@ -1028,8 +1048,392 @@ $ curl -s http://a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.am
 - CloudFront経由でアクセスし、アプリケーションの動作確認を行う
 
 ```
-$ cd k8sbook/frontend-app
-$ npm install
+$ cd k8sbook/frontend-app; npm install
 ```
 
 
+```
+$ kubectl get all
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/backend-app-89b68f9fc-gj94v   1/1     Running   0          133m
+pod/backend-app-89b68f9fc-mrbn2   1/1     Running   0          133m
+
+NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP                                                                  PORT(S)          AGE
+service/backend-app-service   LoadBalancer   10.100.61.85   a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com   8080:30893/TCP   123m
+
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend-app   2/2     2            2           161m
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-app-89b68f9fc   2         2         2       161m
+```
+
+service/ から始まる行のEXTERNAL-IP列の値をメモる
+
+```
+$ BASE_URL=http://a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com:8080 npm run build
+```
+
+CloudFormationは「スタックを作成」->「新しいリソースを使用」を押し、30_s3_cloudfront_cfn.yamlを選択して作成
+
+```
+$ aws s3 ls
+2021-08-21 10:21:47 cf-templates-sppp0xkpzhes-ap-northeast-1
+2023-07-05 01:03:15 eks-work-frontendks
+2022-03-20 23:30:27 mattermost-bucket-okmt1230z
+```
+
+```
+$ aws s3 sync dist s3://eks-work-frontendks --delete --include "*" --acl public-read
+upload failed: dist/.nojekyll to s3://eks-work-frontendks/.nojekyll An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/70ce022.js to s3://eks-work-frontendks/_nuxt/70ce022.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/44844a7.js to s3://eks-work-frontendks/_nuxt/44844a7.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/favicon.ico to s3://eks-work-frontendks/favicon.ico An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/8bc0000.js to s3://eks-work-frontendks/_nuxt/8bc0000.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/613ab16.js to s3://eks-work-frontendks/_nuxt/613ab16.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/index.html to s3://eks-work-frontendks/index.html An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/LICENSES to s3://eks-work-frontendks/_nuxt/LICENSES An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/239fd50.js to s3://eks-work-frontendks/_nuxt/239fd50.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/200.html to s3://eks-work-frontendks/200.html An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/_nuxt/9cf1e70.js to s3://eks-work-frontendks/_nuxt/9cf1e70.js An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/v.png to s3://eks-work-frontendks/v.png An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: dist/regionDetail/index.html to s3://eks-work-frontendks/regionDetail/index.html An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+```
+
+MFAを設定する
+
+```
+ $ aws sts get-session-token --serial-number arn:aws:iam::761624429622:mfa/oldest-iphone --token-code 136672 --profile mfa
+{
+    "Credentials": {
+        "AccessKeyId": "ASIA3CVC2QQ3LJ5GVQP6",
+        ...
+        ...
+        "Expiration": "2023-07-05T17:56:12+00:00"
+    }
+}
+```
+
+public readは一旦外す
+
+```
+$ aws s3 sync dist s3://eks-work-frontendks --delete --include "*"
+upload: dist/.nojekyll to s3://eks-work-frontendks/.nojekyll
+upload: dist/index.html to s3://eks-work-frontendks/index.html    
+upload: dist/regionDetail/index.html to s3://eks-work-frontendks/regionDetail/index.html
+upload: dist/_nuxt/LICENSES to s3://eks-work-frontendks/_nuxt/LICENSES
+upload: dist/_nuxt/613ab16.js to s3://eks-work-frontendks/_nuxt/613ab16.js
+upload: dist/_nuxt/9cf1e70.js to s3://eks-work-frontendks/_nuxt/9cf1e70.js
+upload: dist/favicon.ico to s3://eks-work-frontendks/favicon.ico  
+upload: dist/200.html to s3://eks-work-frontendks/200.html        
+upload: dist/_nuxt/44844a7.js to s3://eks-work-frontendks/_nuxt/44844a7.js
+upload: dist/v.png to s3://eks-work-frontendks/v.png              
+upload: dist/_nuxt/70ce022.js to s3://eks-work-frontendks/_nuxt/70ce022.js
+upload: dist/_nuxt/239fd50.js to s3://eks-work-frontendks/_nuxt/239fd50.js
+upload: dist/_nuxt/8bc0000.js to s3://eks-work-frontendks/_nuxt/8bc0000.js
+```
+
+CloudFront ディストリビューションのキャッシュ無効化させる
+
+```
+$ aws cloudfront create-invalidation --distribution-id E2UDWV4TAPJ2KO --path "/*"
+{
+    "Location": "https://cloudfront.amazonaws.com/2020-05-31/distribution/E2UDWV4TAPJ2KO/invalidation/IAHB1QMXDMHI9PJ9PBMXCESIGW",
+    "Invalidation": {
+        "Id": "IAHB1QMXDMHI9PJ9PBMXCESIGW",
+        "Status": "InProgress",
+        "CreateTime": "2023-07-05T06:17:49.765000+00:00",
+        "InvalidationBatch": {
+            "Paths": {
+                "Quantity": 1,
+                "Items": [
+                    "/*"
+                ]
+            },
+            "CallerReference": "cli-1688537868-444282"
+        }
+    }
+}
+```
+
+EKSのeks-work-frontendの出力の値を見て、URLを確認
+
+![frontend-outout](./eks-frontend-output.png)
+
+http://d9gtzk6ywkybn.cloudfront.net
+
+
+![view](./view.png)
+
+パブリックアクセス可能になっているのでセキュリティには注意してね
+
+![public](./publicaccess.png)
+
+ちょっとダサいかも
+
+## バッチアプリケーションのビルドとデプロイ
+
+k8sのCronJobという仕組みを利用する
+
+バッチアプリケーションのビルド
+
+```
+$ cd k8sbook/batch-app; ./gradlew clean build
+Starting a Gradle Daemon (subsequent builds will be faster)
+
+BUILD SUCCESSFUL in 28s
+14 actionable tasks: 13 executed, 1 up-to-date
+```
+
+コンテナイメージの作成
+
+```
+$ docker build --platform amd64 -t k8sbook/batch-app:1.0.0 --build-arg JAR_TILE=./k8sbook/batch-app/build/libs/batch-app-1.0.0.jar .
+
+[+] Building 14.8s (8/8) FINISHED                                                                                                                                           
+ => [internal] load build definition from Dockerfile                                                                                                                   0.0s
+ => => transferring dockerfile: 37B                                                                                                                                    0.0s
+ => [internal] load .dockerignore                                                                                                                                      0.0s
+ => => transferring context: 2B                                                                                                                                        0.0s
+ => [internal] load metadata for docker.io/library/amazoncorretto:11                                                                                                   1.4s
+ => [internal] load build context                                                                                                                                      6.7s
+ => => transferring context: 605.14MB                                                                                                                                  6.6s
+ => [1/3] FROM docker.io/library/amazoncorretto:11@sha256:97297e012ef1adc7722f4525184b039423955fb8625fa33b2aaabf1b7021252b                                             0.0s
+ => CACHED [2/3] RUN ln -sf /usr/share/zoneinfo/Japan /etc/localtime                                                                                                   0.0s
+ => [3/3] COPY  app.jar                                                                                                                                                4.0s
+ => exporting to image                                                                                                                                                 2.5s
+ => => exporting layers                                                                                                                                                2.5s
+ => => writing image sha256:45ed4f2c5457c878086b1816f210537459c0e41dc19fdc604cc18d02ed90e954                                                                           0.0s
+ => => naming to docker.io/k8sbook/batch-app:1.0.0                                                                                                                     0.0s
+Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them
+```
+
+docker images
+
+```
+$ docker images
+REPOSITORY                   TAG       IMAGE ID       CREATED          SIZE
+k8sbook/batch-app            1.0.0     b7cedad92304   19 seconds ago   1.05GB
+```
+
+ECRレポジトリの作成
+
+![batch-app-repository](./batch-app-repository.png)
+
+```
+$ docker tag k8sbook/batch-app:1.0.0 761624429622.dkr.ecr.ap-northeast-1.amazonaws.com/k8sbook/batch-app:1.0.0
+$ docker push 761624429622.dkr.ecr.ap-northeast-1.amazonaws.com/k8sbook/batch-app:1.0.0
+```
+
+![batch-app-repository2](./batch-app-repository2.png)
+
+バッチアプリケーションが使用するS3バケットを作成する
+
+CloudFormationで`40_s3_batch_cfn.yaml`を食わせて作成
+
+![eks-work-batch](./eks-work-batch.png)
+
+S3バケットが作成されたら、バッチアプリケーションの設定値を格納するConfigMapを作成する
+
+`41_config_map_batch_k8s.yaml.template`
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: batch-app-config
+data:
+  bucket-name: eks-work-batch-${BUCKET_SUFFIX}
+  folder-name: locationData
+  batch-run: "true"
+  aws-region: ap-northeast-1
+```
+
+ConfigMapの作成
+
+```
+$ BUCKET_SUFFIX=ks \
+envsubst < 41_config_map_batch_k8s.yaml.template | kubectl apply -f -
+configmap/batch-app-config created
+```
+
+```
+$ kubectl get configmap batch-app-config
+NAME               DATA   AGE
+batch-app-config   4      9m58s
+
+$ kubectl get configmap batch-app-config -o yaml
+apiVersion: v1
+data:
+  aws-region: ap-northeast-1
+  batch-run: "true"
+  bucket-name: eks-work-batch-ks
+  folder-name: locationData
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"aws-region":"ap-northeast-1","batch-run":"true","bucket-name":"eks-work-batch-ks","folder-name":"locationData"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"batch-app-config","namespace":"eks-work"}}
+  creationTimestamp: "2023-07-06T10:21:59Z"
+  name: batch-app-config
+  namespace: eks-work
+  resourceVersion: "1615192"
+  uid: 4e45d394-0d99-4faa-99e1-fd690ac4434e
+```
+
+S3アクセス用アクセスキーの取得とSecretの作成
+
+AWS System Managerのパラメータストア
+
+![parameterstore](./parameterstore.png)
+
+アクセスキーを確認できる
+
+`42_batch_secrets_k8s.yaml.template`を用意
+
+```
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: batch-secret-config
+stringData:
+  aws-accesskey: ${AWS_ACCESSKEY}
+  aws-secretkey: ${AWS_SECRETKEY}
+```
+
+```
+AWS_ACCESSKEY=~ \
+AWS_SECRETKEY=~ \
+envsubst < 42_batch_secrets_k8s.yaml.template | kubectl apply -f -
+secret/batch-secret-config created
+```
+
+バッチアプリケーションへの入力ファイルの配置
+
+```
+$ aws s3 sync k8sbook/batch-app/sample_data/normal s3:eks-work-batch-ks/locationData --delete --include "*" --acl public-read
+upload failed: k8sbook/batch-app/sample_data/normal/sample_location1.csv to s3://eks-work-batch-ks/locationData/sample_location1.csv An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+upload failed: k8sbook/batch-app/sample_data/normal/sample_location2.csv to s3://eks-work-batch-ks/locationData/sample_location2.csv An error occurred (AccessControlListNotSupported) when calling the PutObject operation: The bucket does not allow ACLs
+```
+
+後からパブリックアクセスできるようにするワ
+
+```
+$ aws s3 sync k8sbook/batch-app/sample_data/normal s3://eks-work-batch-ks/locationData --delete --include "*"
+upload: k8sbook/batch-app/sample_data/normal/sample_location1.csv to s3://eks-work-batch-ks/locationData/sample_location1.csv
+upload: k8sbook/batch-app/sample_data/normal/sample_location2.csv to s3://eks-work-batch-ks/locationData/sample_location2.csv
+```
+
+バッチアプリケーションのデプロイ
+
+`43_cronjob_k8s.yaml.template`
+
+```
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: batch-app
+spec:
+  schedule: "*/5 * * * *" # min hour day-of-month month day-of-week
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: batch-app
+              image: ${ECR_HOST}/k8sbook/batch-app:1.0.0
+              imagePullPolicy: Always
+              env:
+                - name: DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-url
+                      name: db-config
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-username
+                      name: db-config
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-password
+                      name: db-config
+                - name: CLOUD_AWS_CREDENTIALS_ACCESSKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-accesskey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_CREDENTIALS_SECRETKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-secretkey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_REGION_STATIC
+                  valueFrom:
+                    configMapKeyRef:
+                      key: aws-region
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_BUCKET_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: bucket-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_FOLDER_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: folder-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_RUN
+                  valueFrom:
+                    configMapKeyRef:
+                      key: batch-run
+                      name: batch-app-config
+          restartPolicy: OnFailure
+```
+
+
+
+```
+$ ECR_HOST=761624429622.dkr.ecr.ap-northeast-1.amazonaws.com \
+envsubst < 43_cronjob_k8s.yaml.template | \
+kubectl apply -f -
+cronjob.batch/batch-app created
+```
+
+
+kubectl get all
+
+```
+$ kubectl get all
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/backend-app-89b68f9fc-gj94v   1/1     Running   0          45h
+pod/backend-app-89b68f9fc-mrbn2   1/1     Running   0          45h
+
+NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP                                                                  PORT(S)          AGE
+service/backend-app-service   LoadBalancer   10.100.61.85   a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com   8080:30893/TCP   45h
+
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend-app   2/2     2            2           45h
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-app-89b68f9fc   2         2         2       45h
+
+NAME                      SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+cronjob.batch/batch-app   */5 * * * *   False     0        <none>          29s
+```
+
+5の倍数の時だけ以下のようにPodが増える
+
+```
+$ kubectl get all
+NAME                              READY   STATUS    RESTARTS      AGE
+pod/backend-app-89b68f9fc-gj94v   1/1     Running   0             45h
+pod/backend-app-89b68f9fc-mrbn2   1/1     Running   0             45h
+pod/batch-app-28144025-zxh7h      0/1     Error     2 (30s ago)   58s
+```
+
+こけているけどまぁいっか
+
+p.129の内容をまとめたい
