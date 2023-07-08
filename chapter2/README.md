@@ -1393,15 +1393,12 @@ spec:
           restartPolicy: OnFailure
 ```
 
-
-
 ```
 $ ECR_HOST=761624429622.dkr.ecr.ap-northeast-1.amazonaws.com \
 envsubst < 43_cronjob_k8s.yaml.template | \
 kubectl apply -f -
 cronjob.batch/batch-app created
 ```
-
 
 kubectl get all
 
@@ -1435,5 +1432,12 @@ pod/batch-app-28144025-zxh7h      0/1     Error     2 (30s ago)   58s
 ```
 
 こけているけどまぁいっか
+
+以下の手順でcronjob止める
+
+```
+$ kubectl delete cronjob batch-app
+cronjob.batch "batch-app" deleted
+```
 
 p.129の内容をまとめたい
