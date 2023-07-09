@@ -76,6 +76,9 @@ Pod初期化用コンテナは以下の利用目的
 - 同梱するとメインコンテナのセキュリティを低下させてしまうツールを用いて初期化処理を行うことができる
 - 初期化処理とアプリケーション本体を独立してビルド・デプロイができる
 
+APIアプリケーションの場合、Deploymentがk8sクラスターに登録されると、
+ReplicaSetが作られ、ResplicaSetからPodが作られ、Podの中でコンテナが動くという仕組みになっている
+
 ## Podの多重化やバージョンアップ・ロールバックを実現するDeployment
 
 Podを用いればk8s cluster上でプログラムを動かせるが、ウェブアプリケーションを動かす場合はPodを直接デプロイすることはそうない
@@ -173,8 +176,210 @@ kubectl describeコマンドで詳細情報を取得する場合は以下のコ�
 
 ```
 $ kubectl describe リソース種別名 オブジェクト名
-ex) $ kubectl describe pod backend-app-89b68f9fc-gj94v
 ```
+
+```
+$ kubectl describe pod backend-app-89b68f9fc-gj94v
+Name:             backend-app-89b68f9fc-gj94v // Podの名称
+Namespace:        eks-work // Podが作成されているNamespace名
+Priority:         0
+Service Account:  default
+Node:             ip-192-168-1-107.ap-northeast-1.compute.internal/192.168.1.107 // Podが配置されているノード名
+Start Time:       Tue, 04 Jul 2023 22:37:53 +0900 //  Podの起動日時
+Labels:           app=backend-app // Deploymentの記載したラベル
+                  pod-template-hash=89b68f9fc
+Annotations:      <none>
+Status:           Running // Podのステータス
+IP:               192.168.1.99 // Podに割り当てられたIPアドレス
+IPs:
+  IP:           192.168.1.99
+Controlled By:  ReplicaSet/backend-app-89b68f9fc // Podを制御している上位オブジェクト
+Containers: // コンテナ単位の状態
+  backend-app:
+    Container ID:   containerd://018718715bfc2efbbd7e38b98da5df257e0ac8522997e117eca8cb5b0a64d4c0
+    Image:          761624429622.dkr.ecr.ap-northeast-1.amazonaws.com/k8sbook/backend-app:1.1.0 // コンテナイメージ名
+    Image ID:       761624429622.dkr.ecr.ap-northeast-1.amazonaws.com/k8sbook/backend-app@sha256:23184d18681afb6957d5699c21c9d22683cacd7d1201c2091b79f13e711ad436
+    Port:           8080/TCP // コンテナが使用するプロトコルとポート番号
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Tue, 04 Jul 2023 22:37:54 +0900
+    Ready:          True
+    Restart Count:  0
+    Limits: // リソース制限
+      cpu:     250m
+      memory:  768Mi
+    Requests: // リソース制限
+      cpu:      100m
+      memory:   512Mi
+    Liveness:   http-get http://:8080/health delay=30s timeout=1s period=30s #success=1 #failure=3 // Podのヘルスチェック Liveness Probe
+    Readiness:  http-get http://:8080/health delay=15s timeout=1s period=30s #success=1 #failure=3 // Podのヘルスチェック Readiness Probe
+    Environment: // k8sによってこのPodに設定されている環境変数。これはdb-configというsecretから割り当てられている
+      DB_URL:       <set to the key 'db-url' in secret 'db-config'>       Optional: false
+      DB_USERNAME:  <set to the key 'db-username' in secret 'db-config'>  Optional: false
+      DB_PASSWORD:  <set to the key 'db-password' in secret 'db-config'>  Optional: false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-b4j9l (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes: // マウントされているボリュームの情報
+  kube-api-access-b4j9l:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+```
+
+## CronJobによるスケジュール起動
+
+CronJobはk8s上でプログラムを時刻あるいは時間間隔を指定して起動するための仕組み
+
+```
+apiVersion: batch/v1 // CronJobに対するAPIバージョン
+kind: CronJob // リソース種別
+metadata:
+  name: batch-app // CronJobの名前
+spec:
+  schedule: "*/5 * * * *" # min hour day-of-month month day-of-week // スケジュール定義
+  jobTemplate: // jobの定義
+    spec:
+      template:
+        spec:
+          containers:
+            - name: batch-app // コンテナの名前
+              image: ${ECR_HOST}/k8sbook/batch-app:1.0.0 // イメージ
+              imagePullPolicy: Always
+              env: // 複数のSecret及びConfigMapから値を取得する
+                - name: DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-url
+                      name: db-config
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-username
+                      name: db-config
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-password
+                      name: db-config
+                - name: CLOUD_AWS_CREDENTIALS_ACCESSKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-accesskey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_CREDENTIALS_SECRETKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-secretkey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_REGION_STATIC
+                  valueFrom:
+                    configMapKeyRef:
+                      key: aws-region
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_BUCKET_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: bucket-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_FOLDER_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: folder-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_RUN
+                  valueFrom:
+                    configMapKeyRef:
+                      key: batch-run
+                      name: batch-app-config
+          restartPolicy: OnFailure
+```
+
+
+CronJobをk8sクラスターに登録して指定した実行時刻が来ると内部的にJobというリソースが作られ、Jobの中でPodが作られる
+
+CronJobの場合、CronJob -> Job -> Podという流れで作られていく
+
+![cronjob](./cronjob.avif)
+
+CronJob、Job、Podのそれぞれの守備範囲をはっきりさせておく
+
+- Cronフォーマットによる時間の管理
+- 重複するジョブの制御など(詳細は後ほど)
+- Jobのステータス管理
+- Jobが正常に完了したかどうかをモニタリング
+- 過去履歴の保持(成功/失敗それぞれ)
+
+Job
+
+- Podのコンフィグ管理
+- Podのステータス管理
+- 失敗時のリトライ有無
+- 失敗時のタイムアウト時間
+- 並行実行数
+- "成功"と判定するために必要な完了数
+
+Pod
+
+- Jobが持つPodのコンフィグを継承、任意のイメージで任意のジョブを実行する(Deploymentのように継続実行ではなく、ジョブを終えるとexitすることが期待される)
+
+## Jobリソースの振る舞い
+
+Jobとは一定の処理を行なって完了するタスクを実行するためのリソース
+
+設定内容によっては複数の処理を並行起動することができる
+
+ジョブの実行数を規定するパラメータには .spec.completions .spec.parallelism がある
+
+ジョブの実行パターン
+
+1. 単一のPodを実行する実行パターン
+2. 完了すべきPodの数を指定する実行パターン
+3. ワークキュー型の実行パターン
+
+それぞれ.spec.completions .spec.parallelismのパラメータを適切に設定することで実装可能
+
+ジョブのリトライ回数はパラメータは.spec.backoffLimitでデフォルト6
+
+同時実行制御のパラメータは.spec.concurrencyPolicyはでデフォルトは1の「Allow」
+
+k8sドキュメントCron Job Limitationsには以下の記述がある
+
+https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+
+```
+基本的にはCronJobからは1つの実行タイミングに1つのJobオブジェクトが作成されるものの、
+稀ではあるが、CronJobオブジェクトから複数のJobオブジェクトが作成されることがあるため、ジョブは冪等性を持つように作成すべき
+```
+
+## 各ノードに必ず１つPodを立ち上げるDaemonSet
+
+k8sクラスターにDaemonSetを登録すると、
+その中で定義されたPodがクラスターに所属しているワーカーのーどごとに一つずつ起動される
+
+DaemonSetのユースケースとしてはログ収集用のエージェントを各ノードで立ち上げるというものがある
+
+## 永続化データを扱うためのStatefulSet
+
+ReplicaSetを使うことでPodが異常終了した場合でも自動的にPodを再起動したり他のノードに再作成したりして
+所定のPod数を維持できる仕組みになっている
+
+つまりReplicaSetからPodが再作成される場合、そのPodは毎回初期状態で起動される
+
+
+
 
 
 
