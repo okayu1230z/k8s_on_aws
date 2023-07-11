@@ -638,8 +638,8 @@ spec:
                       name: batch-app-config
           restartPolicy: OnFailure
 </div></code></pre>
-<p>CronJobか内部的にJobというリソースが作られる</p>
-<p>CronJobの場合あ、CronJob -&gt; Job -&gt; Podという流れで作られていく</p>
+<p>CronJobをk8sクラスターに登録して指定した実行時刻が来ると内部的にJobというリソースが作られ、Jobの中でPodが作られる</p>
+<p>CronJobの場合、CronJob -&gt; Job -&gt; Podという流れで作られていく</p>
 <p><img src="./cronjob.avif" alt="cronjob"></p>
 <p>CronJob、Job、Podのそれぞれの守備範囲をはっきりさせておく</p>
 <ul>
@@ -662,6 +662,85 @@ spec:
 <ul>
 <li>Jobが持つPodのコンフィグを継承、任意のイメージで任意のジョブを実行する(Deploymentのように継続実行ではなく、ジョブを終えるとexitすることが期待される)</li>
 </ul>
+<h2 id="job%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9%E3%81%AE%E6%8C%AF%E3%82%8B%E8%88%9E%E3%81%84">Jobリソースの振る舞い</h2>
+<p>Jobとは一定の処理を行なって完了するタスクを実行するためのリソース</p>
+<p>設定内容によっては複数の処理を並行起動することができる</p>
+<p>ジョブの実行数を規定するパラメータには .spec.completions .spec.parallelism がある</p>
+<p>ジョブの実行パターン</p>
+<ol>
+<li>単一のPodを実行する実行パターン</li>
+<li>完了すべきPodの数を指定する実行パターン</li>
+<li>ワークキュー型の実行パターン</li>
+</ol>
+<p>それぞれ.spec.completions .spec.parallelismのパラメータを適切に設定することで実装可能</p>
+<p>ジョブのリトライ回数はパラメータは.spec.backoffLimitでデフォルト6</p>
+<p>同時実行制御のパラメータは.spec.concurrencyPolicyはでデフォルトは1の「Allow」</p>
+<p>k8sドキュメントCron Job Limitationsには以下の記述がある</p>
+<p>https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/</p>
+<pre class="hljs"><code><div>基本的にはCronJobからは1つの実行タイミングに1つのJobオブジェクトが作成されるものの、
+稀ではあるが、CronJobオブジェクトから複数のJobオブジェクトが作成されることがあるため、ジョブは冪等性を持つように作成すべき
+</div></code></pre>
+<h2 id="%E5%90%84%E3%83%8E%E3%83%BC%E3%83%89%E3%81%AB%E5%BF%85%E3%81%9A%EF%BC%91%E3%81%A4pod%E3%82%92%E7%AB%8B%E3%81%A1%E4%B8%8A%E3%81%92%E3%82%8Bdaemonset">各ノードに必ず１つPodを立ち上げるDaemonSet</h2>
+<p>k8sクラスターにDaemonSetを登録すると、
+その中で定義されたPodがクラスターに所属しているワーカーのーどごとに一つずつ起動される</p>
+<p>DaemonSetのユースケースとしてはログ収集用のエージェントを各ノードで立ち上げるというものがある</p>
+<h2 id="%E6%B0%B8%E7%B6%9A%E5%8C%96%E3%83%87%E3%83%BC%E3%82%BF%E3%82%92%E6%89%B1%E3%81%86%E3%81%9F%E3%82%81%E3%81%AEstatefulset">永続化データを扱うためのStatefulSet</h2>
+<p>ReplicaSetを使うことでPodが異常終了した場合でも自動的にPodを再起動したり他のノードに再作成したりして
+所定のPod数を維持できる仕組みになっている</p>
+<p>つまりReplicaSetからPodが再作成される場合、そのPodは毎回初期状態で起動される</p>
+<p>ただし、コンテナが初期状態になるとデータベースのように保持しているデータまで初期化されるのは困る</p>
+<p>Podの外にVolumeという形でデータを保持し、Podが再起動された場合でもそれまで使っていたVolumeを引き継ぐ仕組みがStatefulSet</p>
+<p>StatefulSetとはk8sがステートフルな状態をもつために必要</p>
+<p>Namespaceはコンテナを動かす環境であるクラスターを論理的に分割して管理・運用するためのリソース</p>
+<p>k8sでは標準で</p>
+<ul>
+<li>default: 明示的にNamespaceを指定しなかった場合に使用されるNamespace</li>
+<li>kube-system: k9sによって作られるオブジェクトが利用するNamespace</li>
+<li>kube-public: 未認証ユーザを含むすべてのユーザから参照できるNamespace</li>
+</ul>
+<p>の3つのNamespaceが存在すると定義されている</p>
+<p>Namespaceは単にリソースをハンチする論理的な区分だけでなくResouceQuoraやNetworkPolicyといった仕組みと併用することで、
+リソース使用量やネットワーク通信の制限などを行うことができる</p>
+<h2 id="namespace%E3%82%92%E5%AE%9A%E7%BE%A9%E3%81%99%E3%82%8B%E3%83%9E%E3%83%8B%E3%83%95%E3%82%A7%E3%82%B9%E3%83%88%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB">Namespaceを定義するマニフェストファイル</h2>
+<p>Namespaceの作成</p>
+<pre class="hljs"><code><div>apiVersion: v1
+kind: Namespace // リソースの種別
+metadata:
+  name: eks-work // 作成するNamespaceの名前
+</div></code></pre>
+<p>※　Deploymentの更新とロールバック</p>
+<h2 id="%E3%82%B3%E3%83%B3%E3%83%86%E3%83%8A%E3%82%92%E5%85%AC%E9%96%8B%E3%81%99%E3%82%8B%E3%81%9F%E3%82%81%E3%81%AE%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9">コンテナを公開するためのリソース</h2>
+<p>複数のPodをServiceで束ねることで単一のDNSでアクセスできるようになる</p>
+<p>Serviceを用いていることで正常に稼働しているPodにリクエストを振り分けることができる</p>
+<pre class="hljs"><code><div>apiVersion: v1 // Serviceリソースのバージョン
+kind: Service // リソース種別
+metadata:
+  name: backend-app-service // Serviceリソースの名前
+spec:
+  type: LoadBalancer // Serviceの種類
+  selector:
+    app: backend-app // Serviceが対象するPodを選択するためのセレクター定義
+  ports: // サービスにサクセスするためのプロトコルとポート割り当て
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+</div></code></pre>
+<p><a href="https://ameblo.jp/bakery-diary/entry-12614040050.html">Serviceの種類</a></p>
+<ul>
+<li>ClusterIP</li>
+<li>NodePort</li>
+<li>LoadBalancer</li>
+<li>ExternalName</li>
+</ul>
+<p>LoadBalancerはクラスター外にロードバランサーが作成される</p>
+<p>クラウドプロバイダーによるがAWSのEKSの場合はELBのロードバランサー（CLB/NLB）が作成される</p>
+<p><img src="./loadbalancer.png" alt="loadbalancer"></p>
+<h2 id="%E8%A8%AD%E5%AE%9A%E6%83%85%E5%A0%B1%E3%81%AA%E3%81%A9%E3%82%92%E5%AE%89%E5%85%A8%E3%81%AB%E6%B3%A8%E5%85%A5%E3%81%99%E3%82%8B%E4%BB%95%E7%B5%84%E3%81%BF">設定情報などを安全に注入する仕組み</h2>
+<p>~</p>
+<h2 id="pod%E3%82%92%E5%AE%89%E5%85%A8%E3%81%AB%E5%81%9C%E6%AD%A2%E3%81%99%E3%82%8B%E3%81%9F%E3%82%81%E3%81%AE%E8%80%83%E6%85%AE">Podを安全に停止するための考慮</h2>
+<p>~</p>
+<h2 id="%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9%E3%83%9E%E3%83%8D%E3%82%B8%E3%83%A1%E3%83%B3%E3%83%88">リソースマネジメント</h2>
+<p>~</p>
 <p>~</p>
 
 </body>

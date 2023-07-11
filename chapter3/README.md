@@ -378,9 +378,83 @@ ReplicaSetを使うことでPodが異常終了した場合でも自動的にPod�
 
 つまりReplicaSetからPodが再作成される場合、そのPodは毎回初期状態で起動される
 
+ただし、コンテナが初期状態になるとデータベースのように保持しているデータまで初期化されるのは困る
 
+Podの外にVolumeという形でデータを保持し、Podが再起動された場合でもそれまで使っていたVolumeを引き継ぐ仕組みがStatefulSet
 
+StatefulSetとはk8sがステートフルな状態をもつために必要
 
+Namespaceはコンテナを動かす環境であるクラスターを論理的に分割して管理・運用するためのリソース
+
+k8sでは標準で
+
+- default: 明示的にNamespaceを指定しなかった場合に使用されるNamespace
+- kube-system: k9sによって作られるオブジェクトが利用するNamespace
+- kube-public: 未認証ユーザを含むすべてのユーザから参照できるNamespace
+
+の3つのNamespaceが存在すると定義されている
+
+Namespaceは単にリソースをハンチする論理的な区分だけでなくResouceQuoraやNetworkPolicyといった仕組みと併用することで、
+リソース使用量やネットワーク通信の制限などを行うことができる
+
+## Namespaceを定義するマニフェストファイル
+
+Namespaceの作成
+
+```
+apiVersion: v1
+kind: Namespace // リソースの種別
+metadata:
+  name: eks-work // 作成するNamespaceの名前
+```
+
+※　Deploymentの更新とロールバック
+
+## コンテナを公開するためのリソース
+
+複数のPodをServiceで束ねることで単一のDNSでアクセスできるようになる
+
+Serviceを用いていることで正常に稼働しているPodにリクエストを振り分けることができる
+
+```
+apiVersion: v1 // Serviceリソースのバージョン
+kind: Service // リソース種別
+metadata:
+  name: backend-app-service // Serviceリソースの名前
+spec:
+  type: LoadBalancer // Serviceの種類
+  selector:
+    app: backend-app // Serviceが対象するPodを選択するためのセレクター定義
+  ports: // サービスにサクセスするためのプロトコルとポート割り当て
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+```
+
+[Serviceの種類](https://ameblo.jp/bakery-diary/entry-12614040050.html)
+
+- ClusterIP
+- NodePort
+- LoadBalancer
+- ExternalName
+
+LoadBalancerはクラスター外にロードバランサーが作成される
+
+クラウドプロバイダーによるがAWSのEKSの場合はELBのロードバランサー（CLB/NLB）が作成される
+
+![loadbalancer](./loadbalancer.png)
+
+## 設定情報などを安全に注入する仕組み
+
+~
+
+## Podを安全に停止するための考慮
+
+~
+
+## リソースマネジメント
+
+~
 
 
 ~
