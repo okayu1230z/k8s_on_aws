@@ -444,9 +444,161 @@ LoadBalancerはクラスター外にロードバランサーが作成される
 
 ![loadbalancer](./loadbalancer.png)
 
+Pingターゲットの `30839` はServiceのNodePortとして割り当てられたもので、今回作成したServiceタイプはLoadBalancerだが、
+その場合でもNodePortが割り当てられ、ロードバランサーはそこを各インスタンスの接続先として構築される
+
+```
+$ kubectl describe service backend-app-service
+Name:                     backend-app-service
+Namespace:                eks-work
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=backend-app
+Type:                     LoadBalancer
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.100.61.85
+IPs:                      10.100.61.85
+LoadBalancer Ingress:     a159eb0af247f42e994342dab57d432a-47984927.ap-northeast-1.elb.amazonaws.com
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  30893/TCP
+Endpoints:                192.168.0.120:8080,192.168.1.99:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+
+NodePortには`38893`が設定されている
+
+LoadBalancerタイプのServiceを作ることでEKSクラスター上のコンテナを公開してインターネット経由でアクセスできるようになる
+
+これは以下のような課題がある
+
+- service単位でELBが作られるため効率が悪い(ELBを複数立てるとその分費用がかさむ)
+- HTTP/HTTPSのロードバランサーとしてより多機能なALBが使えない
+
+Ingressはk8sクラスターへの入り口を作るためのリソースで動作確認にて起業するIngress Controllerを併用することで、
+k8sクラスターへの共通の入り口を作る、複数のアプリケーションをクラスター外に後悔することができる
+
+AWS ALB Ingress Controllerの使用はやや複雑な設定が必要となる
+
+※ ロードバランサーでHTTPSをサポートする
+
 ## 設定情報などを安全に注入する仕組み
 
-~
+[The Twelve-Factor App](https://12factor.net/) はモダンアプリケーションを開発するための方法論には「アプリケーションの設定情報は環境変数に格納する」という原則がある
+
+k8sではSecretを使った機密情報の引き渡しを行う
+
+Podの起動時にSecretから値を取得し、環境変数などに設定する
+
+さらに、ボリュ０無としてマウントしておくと管理者によって更新されてもPod内の値も動的に更新される
+
+```
+apiVersion: v1
+kind: Secret // リソース種別
+type: Opaque // キューバリューのペアを登録する場合はOpaqueを指定
+metadata:
+  name: db-config // Secretリソースの名前
+stringData: // 実際に登録したいデータをキーバリュー形式で指定している
+  db-url: jdbc:postgresql://eks-work-db.cl1b9exbukrt.ap-northeast-1.rds.amazonaws.com/myworkdb
+  db-username: mywork
+  db-password: ${PASSWORD}
+```
+
+
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-app
+  labels:
+    app: backend-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-app
+  template:
+    metadata:
+      labels:
+        app: backend-app
+    spec:
+      containers:
+        - name: backend-app
+          image: 761624429622.dkr.ecr.ap-northeast-1.amazonaws.com/k8sbook/backend-app:1.1.0
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 8080
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  key: db-url
+                  name: db-config
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: db-username
+                  name: db-config
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: db-password
+                  name: db-config
+          readinessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 250m
+              memory: 768Mi
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 2"]
+```
+
+`secretKeyRef`を指定してSecretから値を参照することを宣言している
+
+`db-config`という名前のSecretからそれぞれ、`db-url` `db-username` `db-password`というキーに設定されている値を参照することになる
+
+```
+$ kubectl exec backend-app-89b68f9fc-gj94v -it -- env | grep DB
+DB_URL=jdbc:postgresql://eks-work-db.cl1b9exbukrt.ap-northeast-1.rds.amazonaws.com/myworkdb
+DB_USERNAME=mywork
+DB_PASSWORD=~
+```
+
+ConfigMapを使った設定情報の引き渡し
+
+以下のマヌフェストでbatch-appの設定をConfigMapに登録している
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: batch-app-config
+data:
+  bucket-name: eks-work-batch-${BUCKET_SUFFIX}
+  folder-name: locationData
+  batch-run: "true"
+  aws-region: ap-northeast-1
+```
 
 ## Podを安全に停止するための考慮
 
